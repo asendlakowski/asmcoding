@@ -1,0 +1,87 @@
+# File printd.ums contains a function for printing Universal Machine words in decimal. 
+
+.section init
+        .zero r0
+        .temps r6, r7
+        
+.section text
+
+###############################################################################
+# r4 holds the input value to be printed and is changed/volatile
+# r5 is volatile register
+# r1 holds the return value and thus must be restored at the end/nonvolatile
+# stack pointer in r2
+###############################################################################
+# Checks if value to be printed is 0, positive, negative, or most-negative-val
+# and calls appropriate function
+print:
+        push r1 on stack r2
+        output ">>> "
+        r5 := 0x80000000 # stores most-negative-value (-2147483648) in r5
+                
+        if (r4 == r0) goto print_zero using r1 # checks if value is 0
+        if (r4 == r5) goto print_most_neg using r1 # most-negative value
+        if (r4 <s r0) goto print_neg using r1 # checks if value is neg
+        if (r4 >s r0) goto print_pos using r1 # checks if value is pos
+
+# Prints "0" to output
+print_zero:
+        output "0\n" 
+        pop r1 off stack r2 # pops r1 off stack to restore return address
+        goto r1 
+
+# Prints negative sign, converts value to positive and calls print_pos
+print_neg:
+        output "-" # outputs negative sign
+        r4 := r4 * -1 # converts value to positive
+        goto print_pos # calls print_pos since value is now positive
+
+# Checks if value is single digit and calls print_single if true, 
+# otherwise initializes magnitude variable, and stores the value on call stack
+print_pos:
+        if (r4 <s 10) goto print_single using r1 # checks if single digit
+        r1 := 1 # sets r1 to 1
+        push r4 on stack r2 # pushes value-to-print on call stack
+        r4 := r4 / 10 # Divide value by 10 for extra get_length loop iteration
+
+# Determines the length (number of digits) of the value to be printed
+# The length is computed as the order of magnitude 
+get_length:
+        r1 := r1 * 10 # mutiplies r1 by 10 for each digit in the value
+        if (r4 >=s r1) goto get_length using r5 # iterates for full number
+        pop r4 off stack r2 # pops original value to be printed
+
+# Loops through a positive number and prints each digit separately
+# by dividing by the magnitude each time to access an individual digit
+# and then the magnitude is divided by 10 to access next digit
+# The loop continues until the magnitude is 1
+pos_loop:
+        r5 := r4 / r1 # divides print value by magnitude
+        r5 := r5 + 48 # Converts digit to ascii character
+        output r5 # outputs a single digit
+        r5 := r5 - 48 # converts ascii character back to digit
+        r5 := r5 * r1 # multiplies value with magnitude
+        r4 := r4 - r5 # subtracts digit printed from value
+        r1 := r1 / 10 # magnitude is divided by 10
+        if (r1 == 0) goto base_case using r5 # checks if magnitude is 0
+        goto pos_loop # loops back to top of pos_loop
+
+# Base case for pos_loop: pops r1 off stack and prints a newline
+base_case:
+        pop r1 off stack r2 # pop r1 to restore return address
+        output "\n"
+        goto r1 # returns to print_loop
+
+# Prints single digit
+print_single:
+        r4 := r4 + '0' # Converts digit to ascii character
+        output r4 # outputs value
+        output "\n"
+        pop r1 off stack r2 # pop r1 to restore return address
+        goto r1 # returns to print_loop
+
+# Prints the most negative number (separate case)
+print_most_neg:
+        output "-2147483648\n" # prints most negative value
+        pop r1 off stack r2 # pop r1 to restore return address
+        goto r1 # returns to print_loop

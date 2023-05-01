@@ -1,0 +1,21 @@
+# contains startup code to allocate space for the call stack (in the data section) and
+# initialize both the stack pointer and register 0 (in the init section).
+
+# The code to initialize the jump table, plus the main loop of the calculator function, which reads
+# a character, checks for EOF, and transfers control via the jump table
+
+# ask abt endstack and do we need a seperate value stack
+
+        
+
+.section init
+        .zero r0
+        .temps r6, r7
+
+_ustart:
+        r0 := 0
+
+.section data
+        .space 1000000
+endstack:
+

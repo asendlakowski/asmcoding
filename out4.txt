@@ -1,0 +1,16 @@
+FAILED on input s  86c/676c d431 +70c955c     s  d   /~74cssp856    d956c*d||640 d397cdd d929-398 |  *d389c &-* d501 s /-*  dpc~
+--- /tmp/tmp.mgaQSOuu3c	2023-04-28 14:55:05.777320089 -0400
++++ /tmp/tmp.SCeWfeQnxQ	2023-04-28 14:55:05.803321035 -0400
+@@ -1,10 +1,10 @@
+ Stack underflow---expected at least 2 elements
+ Stack underflow---expected at least 2 elements
+->>> 20173951
++>>> 19975054
+ >>> 640
+ >>> 640
+ >>> -818312
+->>> -2
++>>> -1
+ >>> -955
+ >>> -245
+ >>> -676

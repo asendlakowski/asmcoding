@@ -1,0 +1,16 @@
+# callmain.ums
+# Names: Alana Sendlakowski (asendl01), Catherine Macbryde (cmacbr01)
+# Date: 1 May 2023
+# Purpose: makes the initial call to main, then halts
+
+        
+
+.section init
+        .zero r0
+        .temps r6, r7
+
+# calls main and links register 1 to offset of the instruction
+call_main:
+        goto main linking r1
+        # output "got back\n"
+        halt 

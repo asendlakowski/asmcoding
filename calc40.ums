@@ -1,0 +1,468 @@
+#
+# calc40.um
+# Names: Catherine MacBryde (cmacbr01), Alana Sendlakowski (asendl01)
+# Date: 1 May 2023
+#
+# Purpose: Performs calculator-related functions and data structures
+#
+
+
+.section init
+
+        .zero r0 # register 0 set to 0
+        .temps r6, r7 # sets r6, r7 as volatile registers
+
+        r3 := endvaluestack # sets r3 to the value stack pointer
+        r2 := endstack # sets r2 to call stack pointer
+
+.section data
+         .space 1000000 # allocates space for valuestack
+
+endvaluestack:
+
+.section rodata
+
+jumptable:
+        .space 256 # allocates space for jumptable
+
+.section init
+
+jump_table: # initializes jumptable
+        r5 := jumptable # sets r5 to bottom of jumptable
+        r4 := jumptable + 255 # sets r4 to top of jumptable
+
+###############################################################################
+# r0 is 0
+# r5 is volatile, r4 is volatile but unchanged
+###############################################################################
+# initializes all jumptable values to input_error by looping
+jump_table_loop: 
+        m[r0][r5] := input_error
+        r5 := r5 + 1 # increments index
+        if (r5 <s r4) goto jump_table_loop using r1
+
+###############################################################################
+# r0 is 0
+###############################################################################
+# overwrites the values in the jumptable indicies that represent
+# ascii digits to set_digit
+is_digit:
+        m[r0][jumptable + '0'] := set_digit
+        m[r0][jumptable + '1'] := set_digit
+        m[r0][jumptable + '2'] := set_digit
+        m[r0][jumptable + '3'] := set_digit
+        m[r0][jumptable + '4'] := set_digit
+        m[r0][jumptable + '5'] := set_digit
+        m[r0][jumptable + '6'] := set_digit
+        m[r0][jumptable + '7'] := set_digit
+        m[r0][jumptable + '8'] := set_digit
+        m[r0][jumptable + '9'] := set_digit
+
+###############################################################################
+# r0 is 0
+###############################################################################
+# overwrites space character in jumptable to go to waiting state
+is_space:
+        m[r0][jumptable + ' '] := waiting_state
+
+###############################################################################
+# r0 is 0
+###############################################################################
+# overwrites the newline character in the jumptable to go to print_stack
+is_newline:
+        m[r0][jumptable + '\n'] := print_stack
+
+###############################################################################
+# r0 is 0
+###############################################################################
+# overwrites specific operation indicies in jumptable to be 
+# their operation function
+is_operator:
+        m[r0][jumptable + '+'] := add
+        m[r0][jumptable + '-'] := minus
+        m[r0][jumptable + '*'] := multiply
+        m[r0][jumptable + '/'] := divide
+        m[r0][jumptable + '|'] := or
+        m[r0][jumptable + '&'] := and
+        m[r0][jumptable + 'c'] := change
+        m[r0][jumptable + '~'] := not
+        m[r0][jumptable + 's'] := swap
+        m[r0][jumptable + 'd'] := duplicate
+        m[r0][jumptable + 'p'] := pop_value
+        m[r0][jumptable + 'z'] := zero_stack
+
+.section rodata
+
+
+.section text
+
+# Calls waiting state to begin program
+main: 
+        goto waiting_state # calls waiting state
+
+###############################################################################
+# r4 is volatile but unchanged
+# r1 used as linking register
+# r5 is nonvolatile
+###############################################################################
+pre_waiting_state:
+        r1 := r4
+        pop r4 off stack r2
+        push r4 on stack r3
+        r4 := r1
+        goto mid_waiting_state
+
+###############################################################################
+# r4 is volatile but unchanged
+# r1 used as linking register
+# r5 is nonvolatile
+###############################################################################
+# Reads input from stdin and calls finish when input value is EOF
+waiting_state:
+        r4 := input() # takes in user input
+        if (r4 == -1) goto finish using r1 # checks if input is EOF
+
+# r1 used as linking register
+# r4 temporarily stores input throughout operation, then is changed
+# r5 is nonvolatile
+# stack pointer in r2
+# Pushes input value on to call stack and goes to the input value's
+# corresponding index in the jumptable
+mid_waiting_state:
+        push r4 on stack r2 # push to maintain input value
+        r4 := jumptable + r4 # finds index in jumptable
+        goto m[r0][r4] linking r1 # goes to jumptable memory location
+
+# r4 is nonvolatile and is used to store input
+# r1 used as linking register
+# r5 is nonvolatile
+# stack pointer in r2
+# Called when the previously read input was a digit and checks if the
+# next input is also a digit, if so it concatenates it with the previous
+# digit
+entering_state:
+        r4 := input()
+        if (r4 == -1) goto finish using r1 # goes to finish if input is EOF
+        
+        # goes to pre-waiting state if input is non-digit
+        if (r4 >s 57) goto pre_waiting_state using r1
+        if (r4 <s 48) goto pre_waiting_state using r1
+        
+        push r4 on stack r2 # pushes input value on call stack
+        r4 := jumptable + r4 # finds index in jumptable
+        goto m[r0][r4] linking r1 # goes to jumptable memory location
+        
+        pop r4 off stack r2 # pops input value off call stack
+        r1 := r4 # temporarily stores input in r1
+        pop r4 off stack r2 # pops previously stored digit off stack
+        r4 := r4 * 10 # multiplies previous value by 10 to shift to the left
+        r4 := r4 + r1 # adds two digits together into 1 value
+        push r4 on stack r2 # pushes newly computed number onto callstack
+        goto entering_state # returns to top of entering state
+
+# r5 is a nonvolatile register
+# Returns to main 
+finish:
+        halt
+        # goto r5 # goes to return address
+
+# r5 is a nonvolatile register
+# r4 is volatile register
+# stack pointer in r2
+# outputs unknown character message for specific ascii input
+input_error:
+        pop r4 off stack r2 # pops user input
+        output "Unknown character '"
+        output r4
+        output "'\n"
+        goto waiting_state # returns to waiting_state
+        
+# r4 is volatile register
+# stack pointer in r2
+# r1, r5 is a nonvolatile register
+# Converts ASCII digit character to digit value 
+set_digit:
+        pop r4 off stack r2 # pops ASCII character off callstack
+        r4 := r4 - '0' # Subtract 48 from ASCII value
+        push r4 on stack r2 # pushes digit value on callstack
+        goto r1
+
+# r4 is volatile register
+# r5 is a nonvolatile register
+# stack pointer in r2
+# does initial pops and pushes to stack to print registers
+print_stack:
+        pop r4 off stack r2
+        push r5 on stack r2
+        r4 := 256 # sets r1 to sentinal value
+        push r4 on stack r2 # stores sentinal value on callstack
+
+# r4, r1 is volatile register
+# r5 is a nonvolatile register
+# stack pointer in r2
+# value stack pointer in r3
+# Loop to iterate through the valuestack to call print for 
+# each value until reaches endvaluestack
+print_loop:
+        if (r3 == endvaluestack) goto end_print_stack using r4
+        pop r4 off stack r3 # pops value off valuestack
+        push r4 on stack r2 # pushes value onto callstack
+        goto print linking r1 # calls print for the value linking r1
+        goto print_loop # returns to top of print_loop
+
+# r4, r1 is volatile register
+# r5 is a nonvolatile register
+# stack pointer in r2
+# value stack pointer in r3
+# Puts the values that were popped off valuestack to be printed back
+# onto value stack
+end_print_stack:
+        pop r4 off stack r2 # pops value that was just printed off callstack
+        push r4 on stack r3 # pushes value back onto valuestack
+
+        if (r4 != 256) goto end_print_stack using r1 # checks if r4 is sentinal value
+        pop stack r3 # pops sentinal value off valuestack
+        pop r5 off stack r2 # pops return address off callstack
+        goto waiting_state
+
+# r4, r1 is volatile register
+# r5 is a nonvolatile register
+# stack pointer in r2
+# value stack pointer in r3
+# Pops the top two values off the valuestack, adds the two values and
+# pushes the result onto the valuestack
+add:
+        pop r4 off stack r2
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # pops y from value stack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # setting r1 to r4
+        pop r4 off stack r3 # pops x from value stack
+        r4 := r4 + r1 # stores x + y in r4
+        push r4 on stack r3 # stores sum on value stack
+        goto waiting_state # returns back to waiting_state
+  
+# r5 is a nonvolatile register
+# stack pointer in r2  
+# Called when an operation requires two elements but two are not 
+# provided
+stack_underflow_2a:
+        output "Stack underflow---expected at least 2 elements\n"
+        pop r5 off stack r2
+        goto waiting_state
+
+# r5 is a nonvolatile register
+# stack pointer in r2
+# Called when an operation requires one element but two are not 
+# provided
+stack_underflow_1:
+        output "Stack underflow---expected at least 1 element\n"
+        pop r5 off stack r2
+        goto waiting_state
+
+# r5 is a nonvolatile register
+# stack pointer in r2    
+# Called when an operation requires two elements but two are not 
+# provided
+stack_underflow_2b:
+        push r4 on stack r3
+        output "Stack underflow---expected at least 2 elements\n"
+        pop r5 off stack r2 
+        goto waiting_state
+
+# Performs a substraction operation by popping the top two elements
+# off the value stack and substracting the first element from the
+# second element
+minus:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # pop y off value stack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # temporarily sets r1 to r4
+        pop r4 off stack r3 # pop x off value stack
+        r4 := r4 - r1 # Stores x - y in r4
+        push r4 on stack r3 # pushes subtracted value on valuestack
+        
+        goto waiting_state
+
+# Performs a multiplication operation by popping the top two elements
+# off the valuestack, multplying them, and then storing the product
+# on the valuestack 
+multiply:
+        pop r4 off stack r2
+        
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # pops x off valuestack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # temporarily stores r4 value in r1
+        pop r4 off stack r3 # pops y off valuestack
+        r4 := r4 * r1 # stores x * y in r4
+        push r4 on stack r3 # pushes product onto valuestack
+
+        goto waiting_state # return to waiting state
+
+# Performs a division operation by popping the top two elements
+# off the valuestack, where the first element popped is the 
+# denominator and the second is the numerator, divides them
+# and stores the quotient on the valuestack
+divide:
+        pop r4 off stack r2 
+        push r5 on stack r2 # pushes return onto valuestack
+        r1 := 1 # sets multiplier equal to 1 and stores in r1
+        push r1 on stack r2 # pushes multiplier (indicates sign of quotient)
+
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # pops denominator off value stack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # sets denominator equal to r1
+        pop r4 off stack r3 # pops numerator off value stack
+        push r1 on stack r3 # pushed denom on value stack 
+
+        if (r1 == 0) goto divide_by_zero using r5 # checks if denominator is 0
+
+        if (r4 >s 0) goto check_negative using r5 # checks numerator sign
+        pop r1 off stack r2 # pops end multiplier
+        r1 := r1 * -1 # multiplies multiplier by negative 1 for negative value
+        push r1 on stack r2 # pushes end multiplier
+        r4 := r4 * -1 # sets numerator to be positive
+
+check_negative:
+        pop r1 off stack r3 # pops denominator off value stack
+        if (r1 >s 0) goto end_divide using r5 # checks denominator sign
+        r1 := r1 * -1 # sets denominator to be positive
+        push r1 on stack r3 # pushed denominator on value stack
+        pop r1 off stack r2 # pops end multiplier
+        r1 := r1 * -1 # multiplies multiplier by negative 1 for negative value
+        push r1 on stack r2 # pushes end multiplier
+        pop r1 off stack r3 # pops denom off value stack
+        
+
+end_divide:
+        r4 := r4 / r1 # performs division operation on 2 positive values
+        pop r1 off stack r2 # pops multiplier
+        r4 := r4 * r1 # multiplies quotient by multiplier
+        push r4 on stack r3 # pushes quotient onto valuestack
+
+        pop r5 off stack r2 # pops r5 to restore it as return address
+        goto waiting_state # returns to waiting_state
+
+divide_by_zero:
+        pop r1 off stack r3 # pops denominator off valuestack
+        output "Division by zero\n"
+        push r4 on stack r3 # pushes numerator back on valuestack
+        r4 := r1 # temporarily sets denominator to r4
+        push r4 on stack r3 # pushes denominator back on stack
+        pop r5 off stack r2 # pops r5 to restore it as return address
+        goto waiting_state # returns to waiting state
+        
+# Performs bitwise or operation with the top two elements on the valuestack
+or:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # pops first element off valuestack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # temporarily stores first element in r1
+        pop r4 off stack r3 # pops second element off valuestack
+        r4 := r4 | r1 # Performs bitwise or operation and stores in r4
+        push r4 on stack r3 # pushes result on valuestack
+
+        goto waiting_state # returns to waiting state
+
+# Performs bitwise and operation on the top two elements of the
+# valuestack and pushes the result on the the valuestack
+and:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # Pops first element off the valuestack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # temporarily stores first element in r1
+        pop r4 off stack r3 # Pops second element off the valuestack
+        r4 := r4 & r1 # Performs bitwise and operation and stores in r4
+        push r4 on stack r3 # Pushes result on valuestack
+
+        goto waiting_state # returns to waiting state
+
+# Changes the sign of the top element on the valuestack
+change:
+        pop r4 off stack r2
+        
+        if (r3 == endvaluestack) goto stack_underflow_1 using r1
+        pop r4 off stack r3 # Pops element off valuestack
+        r4 := r4 * -1 # Multiplies the element by -1
+        push r4 on stack r3 # Pushes result on valuestack
+
+        goto waiting_state # returns to waiting state
+
+# Pops the top element off the valuestack and performs a bitwise
+# not on the value and pushes the result on the valuestack
+not:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_1 using r1
+        pop r4 off stack r3 # Pops element off valuestack
+        r4 := ~r4 # Performs bitwise not and stores result in r4
+        push r4 on stack r3 # Pushes result on valuestack
+
+        goto waiting_state # returns to waiting state
+
+# Swaps the top two elements on top of the valuestack
+swap:
+        pop r4 off stack r2
+        push r5 on stack r2 # Pushes r5 so it can be used as free variable
+
+        if (r3 == endvaluestack) goto stack_underflow_2a using r1
+        pop r4 off stack r3 # Pops first element off valuestack
+        if (r3 == endvaluestack) goto stack_underflow_2b using r1
+        r1 := r4 # Temporarily stores first element in r1
+        pop r4 off stack r3 # Pops second element off valuestack
+        r5 := r4 # Temporarily stores second element in r5
+
+        r4 := r1 # Stores first element in r4
+        push r4 on stack r3 # Pushes first element on valuestack
+        r4 := r5 # Stores second element in r4
+        push r4 on stack r3 # Pushes second element on valuestack
+
+        pop r5 off stack r2 # pops r5 to restore it as return address
+        goto waiting_state # returns to waiting state
+
+# Duplicates the value on the top of the value stack
+duplicate:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_1 using r1
+        pop r4 off stack r3 # Pops top element off valuestack
+        push r4 on stack r3 # Pushes top element back on value stack
+        push r4 on stack r3 # Pushes top element on value stack again
+
+        goto waiting_state # returns to waiting state
+
+# Pops the top element on the value stack and discards it
+pop_value:
+        pop r4 off stack r2
+
+        if (r3 == endvaluestack) goto stack_underflow_1 using r1
+        pop r4 off stack r3 # Pops top element off value stack
+
+        goto waiting_state # returns to waiting state
+
+# Removes all the values from the value stack 
+zero_stack:
+        pop r4 off stack r2
+        push r5 on stack r2 # pushes r5 on callstack for use
+        if (r3 == endvaluestack) goto zero_end using r5
+
+# Loop that continues to pop elements off the value stack
+# until the endvaluestack is reached
+zero_loop:
+        pop r4 off stack r3
+        if (r3 != endvaluestack) goto zero_loop using r5  
+        
+# Pops r5 off the call stack and returns to waiting state
+zero_end:
+        pop r5 off stack r2 # pops r5 to restore it as return address
+        goto waiting_state # returns to waiting state
+
+end:
